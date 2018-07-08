@@ -1,0 +1,177 @@
+//UpdatingForm.cpp
+#include "UpdatingForm.h"
+#include "CashBook.h"
+#include "Account.h"
+#include "FindingForm.h"
+#include <afxcmn.h>
+#include<AFXDTCTL.H>
+#include <stdlib.h>
+
+
+BEGIN_MESSAGE_MAP(UpdatingForm, CDialog)
+	ON_BN_CLICKED(IDC_BUTTON_RECORD, OnRecordButtonClicked)
+	ON_BN_CLICKED(IDC_BUTTON_FIND, OnFindButtonClicked)
+	ON_BN_CLICKED(IDC_BUTTON_CORRECT, OnCorrectButtonClicked)
+	ON_BN_CLICKED(IDC_BUTTON_CALCULATE, OnCalculateButtonClicked)
+	ON_EN_KILLFOCUS(IDC_EDIT_AMOUNT, OnAmountEditKillFocus)
+	//ON_NOTIFY(NM_DBLCLK, IDC_LIST_ACCOUNTS, OnListViewItemDoubleClicked)
+	ON_WM_CLOSE()
+END_MESSAGE_MAP()
+
+UpdatingForm::UpdatingForm(CWnd *parent)
+	:CDialog(UpdatingForm::IDD, parent) {
+	this->cashBook = NULL;
+}
+
+//1. 윈도우가 생성되었을 때
+BOOL UpdatingForm::OnInitDialog() {
+	CDialog::OnInitDialog(); //코드 재사용성
+
+	//1.1 가계부를 준비한다.
+	this->cashBook = new CashBook;
+
+	//1.2 리스트뷰의 헤더를 만든다.
+	((CListCtrl*)(this->GetDlgItem(IDC_LIST_ACCOUNTS)))->InsertColumn(0, "일자", LVCFMT_CENTER, 100);
+	((CListCtrl*)(this->GetDlgItem(IDC_LIST_ACCOUNTS)))->InsertColumn(1, "적요", LVCFMT_CENTER, 100);
+	((CListCtrl*)(this->GetDlgItem(IDC_LIST_ACCOUNTS)))->InsertColumn(2, "금액", LVCFMT_CENTER, 100);
+	((CListCtrl*)(this->GetDlgItem(IDC_LIST_ACCOUNTS)))->InsertColumn(3, "잔액", LVCFMT_CENTER, 100);
+	((CListCtrl*)(this->GetDlgItem(IDC_LIST_ACCOUNTS)))->InsertColumn(4, "비고", LVCFMT_CENTER, 100);
+
+	//1.3
+	((CButton*)(this->GetDlgItem(IDC_RADIO_OUTGO)))->SetCheck(BST_CHECKED);
+	((CButton*)(this->GetDlgItem(IDC_RADIO_INCOME)))->SetCheck(BST_UNCHECKED);
+
+	return FALSE;
+	
+}
+
+//2. 기재하기 버튼을 클릭했을 때
+void UpdatingForm::OnRecordButtonClicked() {
+	//2.1
+	int checkOutgo = ((CButton*)(this->GetDlgItem(IDC_RADIO_OUTGO)))->GetCheck();
+
+	//2.2
+	SYSTEMTIME systemTime = { 0, };
+	((CDateTimeCtrl*)(this->GetDlgItem(IDC_DATETIMEPICKER_DATE)))->GetTime(&systemTime);
+	CString date;
+	date.Format("%d-%02d-%02d", systemTime.wYear, systemTime.wMonth, systemTime.wDay);
+	CString content;
+	(this->GetDlgItem(IDC_EDIT_CONTENT))->GetWindowText(content);
+	CString amount;
+	(this->GetDlgItem(IDC_EDIT_AMOUNT))->GetWindowText(amount);
+	CString comment;
+	(this->GetDlgItem(IDC_EDIT_COMMENT))->GetWindowText(comment);
+
+	//2.3
+	Long year = _ttoi(date.Left(4));
+	Long month = _ttoi(date.Mid(5, 2));
+	Long day = _ttoi(date.Right(2));
+
+}
+
+//3. 찾기 버튼을 클릭했을 때
+
+void UpdatingForm::OnFindButtonClicked() {
+	FindingForm findingForm;
+
+	//3.1 찾기 윈도우를 생성한다.
+	findingForm.DoModal();
+}
+
+
+//4. 고치기 버튼을 클릭했을 때
+void UpdatingForm::OnCorrectButtonClicked() {
+	//4.1 금액, 비고를 읽는다.
+	CString amount;
+	this->GetDlgItem(IDC_EDIT_AMOUNT)->GetWindowText(amount);
+	CString comment;
+	this->GetDlgItem(IDC_EDIT_COMMENT)->GetWindowText(comment);
+
+	//4.2 리스트뷰의 선택된 항목의 위치를 읽는다.
+	Long index = (Long)(((CListCtrl*)(this->GetDlgItem(IDC_LIST_ACCOUNTS)))->GetSelectionMark());
+
+	//4.3 가계부에서 고친다.
+	Currency cAmount = atof(amount);
+	index = this->cashBook->Correct(index, cAmount, (LPCTSTR)comment);
+	Account *accountLink = this->cashBook->GetAt(index);
+
+	//4.4 리스트뷰에서 항목을 고쳐적는다.
+	cAmount = accountLink->GetAmount();
+	amount.Format("%0.1f", cAmount);
+	((CListCtrl*)(this->GetDlgItem(IDC_LIST_ACCOUNTS)))->SetItemText(index, 2, amount);
+
+	Currency cBalance = accountLink->GetBalance();
+	CString balance;
+	balance.Format("%0.1f", cBalance);
+	((CListCtrl*)(this->GetDlgItem(IDC_LIST_ACCOUNTS)))->SetItemText(index, 3, balance);
+
+	comment = CString(accountLink->GetComment().c_str());
+	((CListCtrl*)(this->GetDlgItem(IDC_LIST_ACCOUNTS)))->SetItemText(index, 4, comment);
+
+	//4.5 리스트뷰에서 고쳐적은 항목 이후의 항목들을 고친다.
+	Long length = this->cashBook->GetLength();
+
+	index++;
+	while (index < length) {
+		accountLink = this->cashBook->GetAt(index);
+		cBalance = accountLink->GetBalance();
+		balance.Format("%0.1f", cBalance);
+		((CListCtrl*)(this->GetDlgItem(IDC_LIST_ACCOUNTS)))->SetItemText(index, 3, balance);
+		index++;
+	}
+
+}
+
+//5. 정산하기 버튼을 클릭했을 때
+
+void UpdatingForm::OnCalculateButtonClicked() {
+	FindingForm findingForm;
+
+	//5.1 찾기(정산하기)윈도우를 생성한다.
+	findingForm.DoModal();
+}
+
+
+//6. 금액 에디트가 포커스를 잃었을 때
+void UpdatingForm::OnAmountEditKillFocus() {
+	//6.1 구분을 읽는다.
+	int isIncome = ((CButton*)(this->GetDlgItem(IDC_RADIO_INCOME)))->GetCheck();
+	int isOutgo = ((CButton*)(this->GetDlgItem(IDC_RADIO_OUTGO)))->GetCheck();
+	//6.2 금액을 읽는다.
+	CString amount;
+	this->GetDlgItem(IDC_EDIT_AMOUNT)->GetWindowText(amount);
+	//6.3 가계부의 마지막항목의 잔액을 읽는다.
+	Long length = this->cashBook->GetLength();
+	Account *accountLink;
+	Currency previousBalance;
+	if (length > 0) {
+		accountLink = this->cashBook->GetAt(length);
+	
+	    previousBalance = accountLink->GetBalance();
+    }
+	Currency balance;
+	CString setBalance;
+	if (isOutgo == BST_CHECKED) {
+		balance = previousBalance - (_ttoi(amount));
+		setBalance.Format("%d", balance);
+		(this->GetDlgItem(IDC_STATIC_BALANCE))->SetWindowText(setBalance);
+	}
+	if (isIncome == BST_CHECKED) {
+		balance = previousBalance + (_ttoi(amount));
+		setBalance.Format("%d", balance);
+		(this->GetDlgItem(IDC_STATIC_BALANCE))->SetWindowText(setBalance);
+	}
+}
+
+//7. 리스트뷰 컨트롤의 항목을 더블클릭 했을 때
+
+//8. 닫기 버튼을 클릭했을 때
+void UpdatingForm::OnClose() {
+	//8.1 가계부를 버린다.
+	if (this->cashBook != NULL) {
+		delete this->cashBook;
+	}
+
+	//8.2 윈도우를 닫는다.
+	this->EndDialog(0);
+}
